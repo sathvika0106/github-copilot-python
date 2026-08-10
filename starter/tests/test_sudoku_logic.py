@@ -11,6 +11,7 @@ from sudoku_logic import (
     is_safe,
     fill_board,
     generate_puzzle,
+    count_solutions,
     EMPTY,
     SIZE,
 )
@@ -82,4 +83,54 @@ def test_generate_puzzle_returns_puzzle_and_solution_with_correct_clues():
     # solution is complete
     assert count_non_empty(solution) == SIZE * SIZE
     # puzzle has exactly 'clues' non-empty cells
+    assert count_non_empty(puzzle) == clues
+
+
+def test_count_solutions_returns_one_for_unique_puzzle():
+    board = [
+        [5, 1, 7, 6, 0, 0, 0, 3, 4],
+        [2, 8, 9, 0, 0, 4, 0, 0, 0],
+        [3, 4, 6, 2, 0, 5, 0, 9, 0],
+        [6, 0, 2, 0, 0, 0, 0, 1, 0],
+        [0, 3, 8, 0, 0, 6, 0, 4, 7],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 9, 0, 0, 0, 0, 0, 7, 8],
+        [7, 0, 3, 4, 0, 0, 5, 6, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ]
+    assert count_solutions(board, limit=2) == 1
+
+
+def test_count_solutions_returns_two_for_multiple_solutions():
+    board = [
+        [0, 0, 0, 0, 0, 0, 1, 2, 3],
+        [0, 0, 0, 0, 0, 0, 4, 5, 6],
+        [0, 0, 0, 0, 0, 0, 7, 8, 9],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [1, 2, 3, 0, 0, 0, 0, 0, 0],
+        [4, 5, 6, 0, 0, 0, 0, 0, 0],
+        [7, 8, 9, 0, 0, 0, 0, 0, 0],
+    ]
+    assert count_solutions(board, limit=2) == 2
+
+
+def test_count_solutions_returns_zero_for_invalid_board():
+    board = create_empty_board()
+    board[0][0] = 1
+    board[0][1] = 1
+    assert count_solutions(board, limit=2) == 0
+
+
+def test_generate_puzzle_has_exactly_one_solution():
+    random.seed(0)
+    puzzle, solution = generate_puzzle(clues=35)
+    assert count_solutions(puzzle, limit=2) == 1
+
+
+def test_generate_puzzle_preserves_requested_clues():
+    random.seed(0)
+    clues = 35
+    puzzle, solution = generate_puzzle(clues=clues)
     assert count_non_empty(puzzle) == clues
