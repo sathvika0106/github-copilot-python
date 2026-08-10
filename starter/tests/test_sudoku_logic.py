@@ -1,16 +1,20 @@
 import os
 import sys
 import random
+import pytest
 
 # Ensure the `starter` package directory is importable when running tests from the repo root
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
+from app import app as flask_app
 from sudoku_logic import (
     create_empty_board,
     deep_copy,
+    get_clues_for_difficulty,
+    generate_puzzle,
+    generate_puzzle_for_difficulty,
     is_safe,
     fill_board,
-    generate_puzzle,
     count_solutions,
     EMPTY,
     SIZE,
@@ -84,6 +88,59 @@ def test_generate_puzzle_returns_puzzle_and_solution_with_correct_clues():
     assert count_non_empty(solution) == SIZE * SIZE
     # puzzle has exactly 'clues' non-empty cells
     assert count_non_empty(puzzle) == clues
+
+
+def test_get_clues_for_difficulty_easy():
+    assert get_clues_for_difficulty('easy') == 45
+
+
+def test_get_clues_for_difficulty_medium():
+    assert get_clues_for_difficulty('medium') == 35
+
+
+def test_get_clues_for_difficulty_hard():
+    assert get_clues_for_difficulty('hard') == 30
+
+
+def test_get_clues_for_difficulty_is_case_insensitive():
+    assert get_clues_for_difficulty('  HaRD  ') == 30
+
+
+def test_get_clues_for_difficulty_invalid_raises_value_error():
+    with pytest.raises(ValueError):
+        get_clues_for_difficulty('unknown')
+
+
+def test_generate_puzzle_for_difficulty_easy():
+    random.seed(0)
+    puzzle, solution = generate_puzzle_for_difficulty('easy')
+    assert count_non_empty(puzzle) == 45
+    assert count_non_empty(solution) == SIZE * SIZE
+    assert count_solutions(puzzle, limit=2) == 1
+
+
+def test_generate_puzzle_for_difficulty_medium():
+    random.seed(0)
+    puzzle, solution = generate_puzzle_for_difficulty('medium')
+    assert count_non_empty(puzzle) == 35
+    assert count_non_empty(solution) == SIZE * SIZE
+    assert count_solutions(puzzle, limit=2) == 1
+
+
+def test_generate_puzzle_for_difficulty_hard():
+    random.seed(0)
+    puzzle, solution = generate_puzzle_for_difficulty('hard')
+    assert count_non_empty(puzzle) == 30
+    assert count_non_empty(solution) == SIZE * SIZE
+    assert count_solutions(puzzle, limit=2) == 1
+
+
+def test_new_route_invalid_difficulty_returns_400():
+    client = flask_app.test_client()
+    response = client.get('/new?difficulty=invalid')
+    assert response.status_code == 400
+    assert response.is_json
+    assert 'error' in response.get_json()
 
 
 def test_count_solutions_returns_one_for_unique_puzzle():

@@ -4,6 +4,22 @@ import random
 SIZE = 9
 EMPTY = 0
 
+DIFFICULTY_MAP = {
+    "easy": 45,
+    "medium": 35,
+    "hard": 30,
+}
+
+
+def get_clues_for_difficulty(difficulty):
+    if not isinstance(difficulty, str):
+        raise ValueError(f"Unsupported difficulty: {difficulty!r}")
+    normalized = difficulty.strip().lower()
+    if normalized not in DIFFICULTY_MAP:
+        raise ValueError(f"Unsupported difficulty: {difficulty!r}")
+    return DIFFICULTY_MAP[normalized]
+
+
 def deep_copy(board):
     return copy.deepcopy(board)
 
@@ -128,3 +144,8 @@ def generate_puzzle(clues=35):
     remove_cells(board, clues)
     puzzle = deep_copy(board)
     return puzzle, solution
+
+
+def generate_puzzle_for_difficulty(difficulty):
+    clues = get_clues_for_difficulty(difficulty)
+    return generate_puzzle(clues=clues)
