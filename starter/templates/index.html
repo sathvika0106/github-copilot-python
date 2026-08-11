@@ -9,9 +9,62 @@
   <h1>Sudoku Game</h1>
   <div id="sudoku-board"></div>
   <div class="controls">
+    <label for="difficulty">Difficulty:</label>
+    <select id="difficulty">
+      <option value="easy">Easy</option>
+      <option value="medium" selected>Medium</option>
+      <option value="hard">Hard</option>
+    </select>
     <button id="new-game">New Game</button>
     <button id="check-solution">Check Solution</button>
+    <button id="hint">Hint</button>
+    <span id="hint-count">Hints: 0</span>
+    <span id="timer" aria-live="polite">00:00</span>
     <span id="message"></span>
+  </div>
+
+  <!-- Leaderboard -->
+  <section id="leaderboard-section">
+    <h2>Top 10 Scores</h2>
+    <div id="leaderboard-container">
+      <table id="leaderboard" aria-live="polite">
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Name</th>
+            <th>Time</th>
+            <th>Difficulty</th>
+            <th>Hints</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- rows inserted dynamically -->
+        </tbody>
+      </table>
+      <div class="leaderboard-actions">
+        <button id="clear-leaderboard">Clear Leaderboard</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Save score modal (hidden by default) -->
+  <div id="save-modal" class="modal" aria-hidden="true">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="save-modal-title">
+      <h3 id="save-modal-title">Save Your Score</h3>
+      <div class="modal-body">
+        <label for="player-name">Name</label>
+        <input id="player-name" type="text" placeholder="Enter your name">
+        <div class="modal-info">
+          <div>Time: <span id="modal-time">00:00</span></div>
+          <div>Difficulty: <span id="modal-difficulty"></span></div>
+          <div>Hints used: <span id="modal-hints">0</span></div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="save-score">Save Score</button>
+        <button id="cancel-save">Cancel</button>
+      </div>
+    </div>
   </div>
   <script src="/static/main.js"></script>
 </body>
