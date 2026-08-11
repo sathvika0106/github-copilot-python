@@ -4,6 +4,12 @@ body {
     text-align: center;
     margin: 0;
     padding: 0;
+    color: #212121;
+}
+
+body.dark-mode {
+    background: #111;
+    color: #f1f1f1;
 }
 
 h1 {
@@ -19,6 +25,45 @@ h1 {
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
+body.dark-mode #sudoku-board {
+    border-color: #bbb;
+    background: #1c1c1c;
+    box-shadow: 0 2px 8px rgba(255,255,255,0.08);
+}
+
+body.dark-mode #timer {
+    color: #f1f1f1;
+    background: rgba(50,50,50,0.9);
+    border-color: #444;
+}
+
+body.dark-mode #leaderboard-section,
+body.dark-mode .modal-content {
+    background: #161616;
+    color: #f1f1f1;
+}
+
+body.dark-mode #leaderboard th,
+body.dark-mode #leaderboard td {
+    border-color: #333;
+}
+
+body.dark-mode #leaderboard tbody tr:nth-child(odd) {
+    background: rgba(255,255,255,0.04);
+}
+body.dark-mode h1 {
+    color: #f1f1f1;
+}
+body.dark-mode #hint-count {
+    color: #f1f1f1;
+}
+body.dark-mode input,
+body.dark-mode select {
+    background: #1f1f1f;
+    color: #f1f1f1;
+    border-color: #444;
+}
+
 .sudoku-row {
     display: flex;
 }
@@ -31,7 +76,21 @@ h1 {
     font-size: 20px;
     outline: none;
     background: #fafafa;
-    transition: background 0.2s;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.sudoku-cell.block-shaded {
+    background: #f3f3f3;
+}
+
+body.dark-mode .sudoku-cell {
+    background: #1a1a1a;
+    border-color: #444;
+    color: #f6f6f6;
+}
+
+body.dark-mode .sudoku-cell.block-shaded {
+    background: #232323;
 }
 
 .sudoku-cell:focus {
@@ -83,10 +142,22 @@ button:hover {
     background: #1565c0;
 }
 
+body.dark-mode button {
+    background: #2e7d32;
+}
+
+body.dark-mode button:hover {
+    background: #1b5e20;
+}
+
 #message {
     margin-left: 20px;
     font-size: 16px;
     color: #d32f2f;
+}
+
+body.dark-mode #message {
+    color: #ffb74d;
 }
 
 /* Timer styles */

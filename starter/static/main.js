@@ -15,6 +15,8 @@ const SCORES_KEY = 'sudokuTopScores';
 const MAX_SCORES = 10;
 let currentDifficulty = null;
 let gameScoreSaved = false; // prevent duplicate submissions per game
+let currentTheme = 'light';
+const THEME_KEY = 'sudokuTheme';
 
 function createBoardElement() {
   const boardDiv = document.getElementById('sudoku-board');
@@ -27,6 +29,9 @@ function createBoardElement() {
       input.type = 'text';
       input.maxLength = 1;
       input.className = 'sudoku-cell';
+      if ((Math.floor(i / 3) + Math.floor(j / 3)) % 2 === 0) {
+        input.classList.add('block-shaded');
+      }
       input.dataset.row = i;
       input.dataset.col = j;
       input.addEventListener('input', (e) => {
@@ -248,13 +253,46 @@ function loadScores() {
 }
 
 function saveScores(scores) {
-    try {
-        localStorage.setItem(SCORES_KEY, JSON.stringify(scores));
-        return true;
-    } catch (err) {
-        console.error('Failed to save scores:', err);
-        return false;
-    }
+  try {
+    localStorage.setItem(SCORES_KEY, JSON.stringify(scores));
+    return true;
+  } catch (err) {
+    console.error('Failed to save scores:', err);
+    return false;
+  }
+}
+
+function applyTheme(theme) {
+  document.body.classList.toggle('dark-mode', theme === 'dark');
+  currentTheme = theme;
+  const themeBtn = document.getElementById('theme-toggle');
+  if (themeBtn) {
+    themeBtn.innerText = theme === 'dark' ? 'Light Mode' : 'Dark Mode';
+  }
+}
+
+function persistTheme(theme) {
+  try {
+    localStorage.setItem(THEME_KEY, theme);
+  } catch (err) {
+    console.error('Failed to save theme preference:', err);
+  }
+}
+
+function initTheme() {
+  try {
+    const stored = localStorage.getItem(THEME_KEY);
+    applyTheme(stored === 'dark' ? 'dark' : 'light');
+  } catch (err) {
+    console.error('Failed to load theme preference:', err);
+    applyTheme('light');
+  }
+}
+
+function toggleTheme() {
+  const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
+  applyTheme(nextTheme);
+  persistTheme(nextTheme);
 }
 
 function validateScore(s) {
@@ -278,8 +316,7 @@ function insertScore(score) {
     return a.ts - b.ts;
   });
   const trimmed = scores.slice(0, MAX_SCORES);
-  saveScores(trimmed);
-  return true;
+  return saveScores(trimmed);
 }
 
 function clearLeaderboard() {
@@ -334,6 +371,7 @@ function hideSaveModal() {
 function onSaveScore() {
   const nameInput = document.getElementById('player-name');
   const saveBtn = document.getElementById('save-score');
+  const msg = document.getElementById('message');
   if (!nameInput) return;
   const name = String(nameInput.value || '').trim();
   if (!name) {
@@ -355,7 +393,15 @@ function onSaveScore() {
     gameScoreSaved = true;
     hideSaveModal();
     renderLeaderboard();
+    if (msg) {
+      msg.style.color = '#388e3c';
+      msg.innerText = 'Score saved successfully!';
+    }
   } else {
+    if (msg) {
+      msg.style.color = '#d32f2f';
+      msg.innerText = 'Failed to save score. Please try again.';
+    }
     alert('Failed to save score.');
   }
   if (saveBtn) saveBtn.disabled = false;
@@ -432,19 +478,19 @@ async function checkSolution() {
   for (let idx = 0; idx < inputs.length; idx++) {
     const inp = inputs[idx];
     if (inp.disabled) continue;
-    inp.className = 'sudoku-cell';
-    if (incorrect.has(idx)) {
-      inp.className = 'sudoku-cell incorrect';
-    }
+    const baseClasses = ['sudoku-cell'];
+    if (inp.classList.contains('block-shaded')) baseClasses.push('block-shaded');
+    if (incorrect.has(idx)) baseClasses.push('incorrect');
+    inp.className = baseClasses.join(' ');
   }
   if (incorrect.size === 0) {
     // stop timer when puzzle is completely correct
     stopTimer();
     msg.style.color = '#388e3c';
-    msg.innerText = 'Congratulations! You solved it!';
+    const hintsText = hintsUsed === 1 ? '1 hint' : `${hintsUsed} hints`;
+    msg.innerText = `Congratulations! You solved it in ${formatTime(lastCompletionTimeSeconds)} using ${hintsText}.`;
     // Only prompt to save score once per completed game
     if (!gameScoreSaved) {
-      // show modal to save score
       showSaveModal();
     }
   } else {
@@ -459,6 +505,8 @@ window.addEventListener('load', () => {
   document.getElementById('check-solution').addEventListener('click', checkSolution);
   const hintBtn = document.getElementById('hint');
   if (hintBtn) hintBtn.addEventListener('click', requestHint);
+  const themeBtn = document.getElementById('theme-toggle');
+  if (themeBtn) themeBtn.addEventListener('click', toggleTheme);
   // leaderboard actions
   const clearBtn = document.getElementById('clear-leaderboard');
   if (clearBtn) clearBtn.addEventListener('click', () => {
@@ -469,6 +517,7 @@ window.addEventListener('load', () => {
   const cancelBtn = document.getElementById('cancel-save');
   if (saveBtn) saveBtn.addEventListener('click', onSaveScore);
   if (cancelBtn) cancelBtn.addEventListener('click', hideSaveModal);
+  initTheme();
   // render leaderboard initially
   renderLeaderboard();
   // initialize
