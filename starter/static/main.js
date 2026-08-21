@@ -1,525 +1,1308 @@
-// Client-side rendering and interaction for the Flask-backed Sudoku
+// Client-side rendering and interaction for the Flask-backed Sudoku game
+
 const SIZE = 9;
+
 let puzzle = [];
+
 // Timer state
 let timerInterval = null;
-let startTimestamp = null; // ms
-let elapsedSeconds = 0; // accumulated seconds when not running
+let startTimestamp = null;
+let elapsedSeconds = 0;
 let timerRunning = false;
-let lastCompletionTimeSeconds = null; // final time in seconds for scoreboard
+let lastCompletionTimeSeconds = null;
+
 // Hint state
 let hintsUsed = 0;
 let hintInProgress = false;
-// Scoreboard state
+
+// Leaderboard state
 const SCORES_KEY = 'sudokuTopScores';
 const MAX_SCORES = 10;
+
 let currentDifficulty = null;
-let gameScoreSaved = false; // prevent duplicate submissions per game
-let currentTheme = 'light';
+let gameScoreSaved = false;
+
+// Theme state
 const THEME_KEY = 'sudokuTheme';
+let currentTheme = 'light';
+
+
+// ============================================================
+// Utility helpers
+// ============================================================
+
+function getMessageElement() {
+    return document.getElementById('message');
+}
+
+function setMessage(text, type = 'error') {
+    const message = getMessageElement();
+
+    if (!message) {
+        return;
+    }
+
+    message.textContent = text;
+
+    if (type === 'success') {
+        message.style.color = '#388e3c';
+    } else if (type === 'error') {
+        message.style.color = '#d32f2f';
+    } else {
+        message.style.color = '';
+    }
+}
+
+function clearMessage() {
+    const message = getMessageElement();
+
+    if (!message) {
+        return;
+    }
+
+    message.textContent = '';
+    message.style.color = '';
+}
+
+
+// ============================================================
+// Sudoku board creation
+// ============================================================
 
 function createBoardElement() {
-  const boardDiv = document.getElementById('sudoku-board');
-  boardDiv.innerHTML = '';
-  for (let i = 0; i < SIZE; i++) {
-    const rowDiv = document.createElement('div');
-    rowDiv.className = 'sudoku-row';
-    for (let j = 0; j < SIZE; j++) {
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.maxLength = 1;
-      input.className = 'sudoku-cell';
-      if ((Math.floor(i / 3) + Math.floor(j / 3)) % 2 === 0) {
-        input.classList.add('block-shaded');
-      }
-      input.dataset.row = i;
-      input.dataset.col = j;
-      input.addEventListener('input', (e) => {
-        const val = e.target.value.replace(/[^1-9]/g, '');
-        e.target.value = val;
-      });
-      rowDiv.appendChild(input);
+    const boardDiv = document.getElementById('sudoku-board');
+
+    if (!boardDiv) {
+        return;
     }
-    boardDiv.appendChild(rowDiv);
-  }
+
+    boardDiv.innerHTML = '';
+
+    for (let row = 0; row < SIZE; row++) {
+        const rowDiv = document.createElement('div');
+
+        rowDiv.className = 'sudoku-row';
+
+        for (let col = 0; col < SIZE; col++) {
+            const input = document.createElement('input');
+
+            input.type = 'text';
+            input.maxLength = 1;
+            input.inputMode = 'numeric';
+            input.autocomplete = 'off';
+
+            input.className = 'sudoku-cell';
+
+            input.dataset.row = String(row);
+            input.dataset.col = String(col);
+
+            /*
+             * Alternate the background of 3x3 blocks.
+             *
+             * Blocks:
+             * 0 1 2
+             * 3 4 5
+             * 6 7 8
+             */
+            const blockNumber =
+                Math.floor(row / 3) * 3 +
+                Math.floor(col / 3);
+
+            if (blockNumber % 2 === 0) {
+                input.classList.add('block-shaded');
+            }
+
+            rowDiv.appendChild(input);
+        }
+
+        boardDiv.appendChild(rowDiv);
+    }
+
+    /*
+     * Event delegation:
+     * One listener on the board handles input from every cell.
+     */
+    boardDiv.addEventListener('input', handleBoardInput);
 }
+
+
+// ============================================================
+// Immediate input validation
+// ============================================================
+
+function handleBoardInput(event) {
+    const cell = event.target;
+
+    if (!cell.classList.contains('sudoku-cell')) {
+        return;
+    }
+
+    if (cell.disabled) {
+        return;
+    }
+
+    // Only allow digits 1-9.
+    const cleanedValue = cell.value.replace(/[^1-9]/g, '');
+
+    cell.value = cleanedValue;
+
+    // Remove previous validation state.
+    cell.classList.remove('invalid-input');
+
+    if (!cleanedValue) {
+        clearConflictMessageIfNeeded();
+        return;
+    }
+
+    /*
+     * Immediately check:
+     * - same row
+     * - same column
+     * - same 3x3 block
+     */
+    if (hasSudokuConflict(cell)) {
+        cell.classList.add('invalid-input');
+
+        setMessage(
+            'That value conflicts with the row, column, or 3×3 box.',
+            'error'
+        );
+    } else {
+        clearConflictMessageIfNeeded();
+    }
+}
+
+
+function hasSudokuConflict(cell) {
+    if (!cell || !cell.value) {
+        return false;
+    }
+
+    const value = cell.value;
+
+    const row = Number(cell.dataset.row);
+    const col = Number(cell.dataset.col);
+
+    const boardDiv = document.getElementById('sudoku-board');
+
+    if (!boardDiv) {
+        return false;
+    }
+
+    const cells = boardDiv.querySelectorAll('.sudoku-cell');
+
+    for (const otherCell of cells) {
+        if (otherCell === cell) {
+            continue;
+        }
+
+        if (!otherCell.value) {
+            continue;
+        }
+
+        if (otherCell.value !== value) {
+            continue;
+        }
+
+        if (Number(otherCell.dataset.row) === row) {
+            return true;
+        }
+
+        if (Number(otherCell.dataset.col) === col) {
+            return true;
+        }
+
+        const otherRow = Number(otherCell.dataset.row);
+        const otherCol = Number(otherCell.dataset.col);
+
+        const sameBlock =
+            Math.floor(row / 3) === Math.floor(otherRow / 3) &&
+            Math.floor(col / 3) === Math.floor(otherCol / 3);
+
+        if (sameBlock) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
+function clearConflictMessageIfNeeded() {
+    const invalidCells = document.querySelectorAll(
+        '.sudoku-cell.invalid-input'
+    );
+
+    if (invalidCells.length === 0) {
+        clearMessage();
+    }
+}
+
+
+// ============================================================
+// Render puzzle
+// ============================================================
 
 function renderPuzzle(puz) {
-  puzzle = puz;
-  createBoardElement();
-  const boardDiv = document.getElementById('sudoku-board');
-  const inputs = boardDiv.getElementsByTagName('input');
-  for (let i = 0; i < SIZE; i++) {
-    for (let j = 0; j < SIZE; j++) {
-      const idx = i * SIZE + j;
-      const val = puzzle[i][j];
-      const inp = inputs[idx];
-      if (val !== 0) {
-        inp.value = val;
-        inp.disabled = true;
-        inp.className += ' prefilled';
-      } else {
-        inp.value = '';
-        inp.disabled = false;
-      }
+    puzzle = puz;
+
+    createBoardElement();
+
+    const boardDiv = document.getElementById('sudoku-board');
+
+    if (!boardDiv) {
+        return;
     }
-  }
+
+    const inputs = boardDiv.querySelectorAll('.sudoku-cell');
+
+    for (let row = 0; row < SIZE; row++) {
+        for (let col = 0; col < SIZE; col++) {
+            const index = row * SIZE + col;
+
+            const input = inputs[index];
+            const value = puzzle[row][col];
+
+            if (value !== 0) {
+                input.value = String(value);
+                input.disabled = true;
+                input.classList.add('prefilled');
+            } else {
+                input.value = '';
+                input.disabled = false;
+            }
+        }
+    }
 }
 
-/* Timer utility functions */
+
+// ============================================================
+// Timer
+// ============================================================
+
 function formatTime(totalSeconds) {
-  const mins = Math.floor(totalSeconds / 60);
-  const secs = totalSeconds % 60;
-  const mm = String(mins).padStart(2, '0');
-  const ss = String(secs).padStart(2, '0');
-  return `${mm}:${ss}`;
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+
+    return (
+        String(minutes).padStart(2, '0') +
+        ':' +
+        String(seconds).padStart(2, '0')
+    );
 }
+
 
 function getElapsedSeconds() {
-  if (timerRunning && startTimestamp !== null) {
-    const delta = Math.floor((Date.now() - startTimestamp) / 1000);
-    return elapsedSeconds + delta;
-  }
-  return elapsedSeconds;
+    if (timerRunning && startTimestamp !== null) {
+        const delta = Math.floor(
+            (Date.now() - startTimestamp) / 1000
+        );
+
+        return elapsedSeconds + delta;
+    }
+
+    return elapsedSeconds;
 }
+
 
 function updateTimerDisplay() {
-  const el = document.getElementById('timer');
-  if (!el) return;
-  const secs = getElapsedSeconds();
-  el.innerText = formatTime(secs);
+    const timer = document.getElementById('timer');
+
+    if (!timer) {
+        return;
+    }
+
+    timer.textContent = formatTime(getElapsedSeconds());
 }
 
-function stopTimer() {
-  if (timerInterval !== null) {
-    clearInterval(timerInterval);
-    timerInterval = null;
-  }
-  if (timerRunning && startTimestamp !== null) {
-    const delta = Math.floor((Date.now() - startTimestamp) / 1000);
-    elapsedSeconds += delta;
-  }
-  timerRunning = false;
-  startTimestamp = null;
-  lastCompletionTimeSeconds = elapsedSeconds;
-  updateTimerDisplay();
-  return lastCompletionTimeSeconds;
-}
 
 function startTimer() {
     if (timerInterval !== null) {
         clearInterval(timerInterval);
-        timerInterval = null;
     }
 
     startTimestamp = Date.now();
     timerRunning = true;
 
     updateTimerDisplay();
-    timerInterval = setInterval(updateTimerDisplay, 1000);
+
+    timerInterval = setInterval(
+        updateTimerDisplay,
+        1000
+    );
 }
+
+
+function stopTimer() {
+    if (timerInterval !== null) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
+
+    if (timerRunning && startTimestamp !== null) {
+        const delta = Math.floor(
+            (Date.now() - startTimestamp) / 1000
+        );
+
+        elapsedSeconds += delta;
+    }
+
+    timerRunning = false;
+    startTimestamp = null;
+
+    lastCompletionTimeSeconds = elapsedSeconds;
+
+    updateTimerDisplay();
+
+    return lastCompletionTimeSeconds;
+}
+
 
 function resetTimer() {
-  stopTimer();
-  elapsedSeconds = 0;
-  lastCompletionTimeSeconds = null;
-  const el = document.getElementById('timer');
-  if (el) el.innerText = formatTime(0);
+    stopTimer();
+
+    elapsedSeconds = 0;
+    lastCompletionTimeSeconds = null;
+
+    updateTimerDisplay();
 }
 
-/* Hint helper functions */
+
+// ============================================================
+// Hint system
+// ============================================================
+
 function getEditableEmptyCells() {
-  const boardDiv = document.getElementById('sudoku-board');
-  if (!boardDiv) return [];
-  const inputs = Array.from(boardDiv.getElementsByTagName('input'));
-  return inputs.filter(inp => !inp.disabled && String(inp.value).trim() === '');
+    const board = document.getElementById('sudoku-board');
+
+    if (!board) {
+        return [];
+    }
+
+    return Array.from(
+        board.querySelectorAll('.sudoku-cell')
+    ).filter(cell =>
+        !cell.disabled &&
+        cell.value.trim() === ''
+    );
 }
 
-function applyHintToCell(inputEl, value) {
-  inputEl.value = String(value);
-  inputEl.disabled = true;
-  // keep base class and add hinted marker
-  if (inputEl.classList) {
-    inputEl.classList.add('hinted');
-  } else {
-    inputEl.className = (inputEl.className + ' hinted').trim();
-  }
+
+function applyHintToCell(cell, value) {
+    cell.value = String(value);
+
+    cell.disabled = true;
+
+    cell.classList.add('hinted');
+
+    // Remove any temporary validation state.
+    cell.classList.remove('invalid-input');
 }
+
 
 async function requestHint() {
-  if (hintInProgress) return;
-  const hintBtn = document.getElementById('hint');
-  const msgEl = document.getElementById('message');
-  const hintCountEl = document.getElementById('hint-count');
-  const editable = getEditableEmptyCells();
-  if (editable.length === 0) {
-    if (msgEl) {
-      msgEl.style.color = '#d32f2f';
-      msgEl.innerText = 'No empty editable cells to hint.';
-    }
-    return;
-  }
-
-  // pick the first editable empty cell
-  const target = editable[0];
-  const row = parseInt(target.dataset.row, 10);
-  const col = parseInt(target.dataset.col, 10);
-
-  hintInProgress = true;
-  if (hintBtn) hintBtn.disabled = true;
-  if (msgEl) { msgEl.innerText = ''; }
-
-  try {
-    // build current board values from DOM
-    const boardDiv = document.getElementById('sudoku-board');
-    const inputs = boardDiv.getElementsByTagName('input');
-    const baseBoard = [];
-    for (let i = 0; i < SIZE; i++) {
-      baseBoard[i] = [];
-      for (let j = 0; j < SIZE; j++) {
-        const idx = i * SIZE + j;
-        const val = inputs[idx].value;
-        baseBoard[i][j] = val ? parseInt(val, 10) : 0;
-      }
+    if (hintInProgress) {
+        return;
     }
 
-    let found = false;
-    for (let k = 1; k <= 9; k++) {
-      // copy board and set candidate
-      const candidateBoard = baseBoard.map(row => row.slice());
-      candidateBoard[row][col] = k;
-      const res = await fetch('/check', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({board: candidateBoard})
-      });
-      if (!res.ok) {
-        throw new Error('Network response was not ok');
-      }
-      const data = await res.json();
-      if (data.error) {
-        // If server says no game in progress or similar, show message and abort
-        if (msgEl) {
-          msgEl.style.color = '#d32f2f';
-          msgEl.innerText = data.error;
+    const hintButton = document.getElementById('hint');
+    const hintCount = document.getElementById('hint-count');
+
+    const editableCells = getEditableEmptyCells();
+
+    if (editableCells.length === 0) {
+        setMessage(
+            'No empty editable cells are available for a hint.',
+            'error'
+        );
+
+        return;
+    }
+
+    const target = editableCells[0];
+
+    const row = Number(target.dataset.row);
+    const col = Number(target.dataset.col);
+
+    hintInProgress = true;
+
+    if (hintButton) {
+        hintButton.disabled = true;
+    }
+
+    clearMessage();
+
+    try {
+        const board = readBoardFromDOM();
+
+        let found = false;
+
+        /*
+         * Test values 1-9 against the server.
+         *
+         * The server tells us which cells are incorrect.
+         * If the selected cell is not reported as incorrect,
+         * the candidate is the correct value.
+         */
+        for (let candidate = 1; candidate <= 9; candidate++) {
+            const candidateBoard =
+                board.map(currentRow => currentRow.slice());
+
+            candidateBoard[row][col] = candidate;
+
+            const response = await fetch('/check', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    board: candidateBoard
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Hint request failed.');
+            }
+
+            const data = await response.json();
+
+            if (data.error) {
+                setMessage(data.error, 'error');
+                return;
+            }
+
+            const incorrect = data.incorrect || [];
+
+            const targetIsIncorrect = incorrect.some(
+                position =>
+                    position[0] === row &&
+                    position[1] === col
+            );
+
+            if (!targetIsIncorrect) {
+                applyHintToCell(target, candidate);
+
+                hintsUsed += 1;
+
+                if (hintCount) {
+                    hintCount.textContent =
+                        `Hints: ${hintsUsed}`;
+                }
+
+                found = true;
+
+                break;
+            }
         }
-        break;
-      }
-      const incorrect = data.incorrect || [];
-      const targetStillIncorrect = incorrect.some(pos => pos[0] === row && pos[1] === col);
-      if (!targetStillIncorrect) {
-        // candidate is correct
-        applyHintToCell(target, k);
-        hintsUsed += 1;
-        if (hintCountEl) hintCountEl.innerText = `Hints: ${hintsUsed}`;
-        found = true;
-        break;
-      }
-    }
 
-    if (!found) {
-      if (msgEl) {
-        msgEl.style.color = '#d32f2f';
-        msgEl.innerText = 'Hint unavailable.';
-      }
+        if (!found) {
+            setMessage(
+                'Hint unavailable for this cell.',
+                'error'
+            );
+        }
+    } catch (error) {
+        console.error('Hint error:', error);
+
+        setMessage(
+            'Unable to get a hint. Please try again.',
+            'error'
+        );
+    } finally {
+        hintInProgress = false;
+
+        if (hintButton) {
+            hintButton.disabled = false;
+        }
     }
-  } catch (err) {
-    console.error('requestHint error:', err);
-    if (msgEl) {
-      msgEl.style.color = '#d32f2f';
-      msgEl.innerText = 'Network error while requesting a hint.';
-    }
-  } finally {
-    hintInProgress = false;
-    if (hintBtn) hintBtn.disabled = false;
-  }
 }
 
-// expose hint getter
-window.getHintsUsed = function () { return hintsUsed; };
 
-// Scoreboard helpers
+// ============================================================
+// Board helpers
+// ============================================================
+
+function readBoardFromDOM() {
+    const board = [];
+
+    const boardDiv =
+        document.getElementById('sudoku-board');
+
+    if (!boardDiv) {
+        return board;
+    }
+
+    const inputs =
+        boardDiv.querySelectorAll('.sudoku-cell');
+
+    for (let row = 0; row < SIZE; row++) {
+        board[row] = [];
+
+        for (let col = 0; col < SIZE; col++) {
+            const index = row * SIZE + col;
+
+            const value = inputs[index].value.trim();
+
+            board[row][col] =
+                value ? Number(value) : 0;
+        }
+    }
+
+    return board;
+}
+
+
+// ============================================================
+// Leaderboard
+// ============================================================
+
+function validateScore(score) {
+    if (!score || typeof score !== 'object') {
+        return false;
+    }
+
+    if (typeof score.name !== 'string') {
+        return false;
+    }
+
+    if (
+        typeof score.timeSeconds !== 'number' ||
+        !Number.isFinite(score.timeSeconds) ||
+        score.timeSeconds < 0
+    ) {
+        return false;
+    }
+
+    if (typeof score.timeFormatted !== 'string') {
+        return false;
+    }
+
+    if (
+        typeof score.difficulty !== 'string' &&
+        score.difficulty !== null
+    ) {
+        return false;
+    }
+
+    if (
+        typeof score.hintsUsed !== 'number' ||
+        score.hintsUsed < 0
+    ) {
+        return false;
+    }
+
+    if (
+        typeof score.ts !== 'number' ||
+        !Number.isFinite(score.ts)
+    ) {
+        return false;
+    }
+
+    return true;
+}
+
+
 function loadScores() {
-  const raw = localStorage.getItem(SCORES_KEY);
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(validateScore);
-  } catch (err) {
-    console.error('Failed to parse scoreboard data, resetting:', err);
-    return [];
-  }
+    try {
+        const raw =
+            localStorage.getItem(SCORES_KEY);
+
+        if (!raw) {
+            return [];
+        }
+
+        const parsed = JSON.parse(raw);
+
+        if (!Array.isArray(parsed)) {
+            return [];
+        }
+
+        return parsed.filter(validateScore);
+    } catch (error) {
+        console.error(
+            'Invalid leaderboard data:',
+            error
+        );
+
+        return [];
+    }
 }
+
 
 function saveScores(scores) {
-  try {
-    localStorage.setItem(SCORES_KEY, JSON.stringify(scores));
-    return true;
-  } catch (err) {
-    console.error('Failed to save scores:', err);
-    return false;
-  }
+    try {
+        localStorage.setItem(
+            SCORES_KEY,
+            JSON.stringify(scores)
+        );
+
+        return true;
+    } catch (error) {
+        console.error(
+            'Failed to save leaderboard:',
+            error
+        );
+
+        return false;
+    }
 }
 
-function applyTheme(theme) {
-  document.body.classList.toggle('dark-mode', theme === 'dark');
-  currentTheme = theme;
-  const themeBtn = document.getElementById('theme-toggle');
-  if (themeBtn) {
-    themeBtn.innerText = theme === 'dark' ? 'Light Mode' : 'Dark Mode';
-  }
-}
-
-function persistTheme(theme) {
-  try {
-    localStorage.setItem(THEME_KEY, theme);
-  } catch (err) {
-    console.error('Failed to save theme preference:', err);
-  }
-}
-
-function initTheme() {
-  try {
-    const stored = localStorage.getItem(THEME_KEY);
-    applyTheme(stored === 'dark' ? 'dark' : 'light');
-  } catch (err) {
-    console.error('Failed to load theme preference:', err);
-    applyTheme('light');
-  }
-}
-
-function toggleTheme() {
-  const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
-  applyTheme(nextTheme);
-  persistTheme(nextTheme);
-}
-
-function validateScore(s) {
-  if (!s || typeof s !== 'object') return false;
-  if (typeof s.name !== 'string') return false;
-  if (typeof s.timeSeconds !== 'number' || !isFinite(s.timeSeconds) || s.timeSeconds < 0) return false;
-  if (typeof s.timeFormatted !== 'string') return false;
-  if (!(typeof s.difficulty === 'string' || s.difficulty === null)) return false;
-  if (typeof s.hintsUsed !== 'number' || s.hintsUsed < 0) return false;
-  if (typeof s.ts !== 'number' || !isFinite(s.ts)) return false;
-  return true;
-}
 
 function insertScore(score) {
-  if (!validateScore(score)) return false;
-  const scores = loadScores();
-  scores.push(score);
-  // sort by timeSeconds asc, tie-breaker ts asc
-  scores.sort((a,b) => {
-    if (a.timeSeconds !== b.timeSeconds) return a.timeSeconds - b.timeSeconds;
-    return a.ts - b.ts;
-  });
-  const trimmed = scores.slice(0, MAX_SCORES);
-  return saveScores(trimmed);
+    if (!validateScore(score)) {
+        return false;
+    }
+
+    const scores = loadScores();
+
+    scores.push(score);
+
+    scores.sort((a, b) => {
+        if (a.timeSeconds !== b.timeSeconds) {
+            return a.timeSeconds - b.timeSeconds;
+        }
+
+        return a.ts - b.ts;
+    });
+
+    const topScores =
+        scores.slice(0, MAX_SCORES);
+
+    /*
+     * IMPORTANT:
+     * Only report success if localStorage actually
+     * accepted the new data.
+     */
+    return saveScores(topScores);
 }
+
 
 function clearLeaderboard() {
-  localStorage.removeItem(SCORES_KEY);
-  renderLeaderboard();
+    try {
+        localStorage.removeItem(SCORES_KEY);
+    } catch (error) {
+        console.error(
+            'Failed to clear leaderboard:',
+            error
+        );
+    }
+
+    renderLeaderboard();
 }
+
 
 function renderLeaderboard() {
-  const tbody = document.querySelector('#leaderboard tbody');
-  if (!tbody) return;
-  tbody.innerHTML = '';
-  const scores = loadScores();
-  for (let i = 0; i < scores.length; i++) {
-    const s = scores[i];
-    const tr = document.createElement('tr');
-    const rankTd = document.createElement('td'); rankTd.innerText = (i+1);
-    const nameTd = document.createElement('td'); nameTd.innerText = s.name;
-    const timeTd = document.createElement('td'); timeTd.innerText = s.timeFormatted;
-    const diffTd = document.createElement('td'); diffTd.innerText = s.difficulty || '';
-    const hintsTd = document.createElement('td'); hintsTd.innerText = String(s.hintsUsed);
-    tr.appendChild(rankTd); tr.appendChild(nameTd); tr.appendChild(timeTd); tr.appendChild(diffTd); tr.appendChild(hintsTd);
-    tbody.appendChild(tr);
-  }
+    const tbody =
+        document.querySelector('#leaderboard tbody');
+
+    if (!tbody) {
+        return;
+    }
+
+    tbody.innerHTML = '';
+
+    const scores = loadScores();
+
+    if (scores.length === 0) {
+        const row = document.createElement('tr');
+
+        const cell = document.createElement('td');
+
+        cell.colSpan = 5;
+        cell.textContent = 'No scores yet.';
+
+        row.appendChild(cell);
+        tbody.appendChild(row);
+
+        return;
+    }
+
+    scores.forEach((score, index) => {
+        const row = document.createElement('tr');
+
+        const rankCell =
+            document.createElement('td');
+
+        const nameCell =
+            document.createElement('td');
+
+        const timeCell =
+            document.createElement('td');
+
+        const difficultyCell =
+            document.createElement('td');
+
+        const hintsCell =
+            document.createElement('td');
+
+        rankCell.textContent = String(index + 1);
+        nameCell.textContent = score.name;
+        timeCell.textContent = score.timeFormatted;
+        difficultyCell.textContent =
+            score.difficulty || '';
+        hintsCell.textContent =
+            String(score.hintsUsed);
+
+        row.appendChild(rankCell);
+        row.appendChild(nameCell);
+        row.appendChild(timeCell);
+        row.appendChild(difficultyCell);
+        row.appendChild(hintsCell);
+
+        tbody.appendChild(row);
+    });
 }
 
-// expose helpers for testing
+
+// ============================================================
+// Theme / dark mode
+// ============================================================
+
+function applyTheme(theme) {
+    currentTheme = theme;
+
+    document.body.classList.toggle(
+        'dark-mode',
+        theme === 'dark'
+    );
+
+    const themeButton =
+        document.getElementById('theme-toggle');
+
+    if (themeButton) {
+        themeButton.textContent =
+            theme === 'dark'
+                ? 'Light Mode'
+                : 'Dark Mode';
+    }
+}
+
+
+function persistTheme(theme) {
+    try {
+        localStorage.setItem(
+            THEME_KEY,
+            theme
+        );
+    } catch (error) {
+        console.error(
+            'Failed to save theme:',
+            error
+        );
+    }
+}
+
+
+function initTheme() {
+    try {
+        const storedTheme =
+            localStorage.getItem(THEME_KEY);
+
+        applyTheme(
+            storedTheme === 'dark'
+                ? 'dark'
+                : 'light'
+        );
+    } catch (error) {
+        console.error(
+            'Failed to load theme:',
+            error
+        );
+
+        applyTheme('light');
+    }
+}
+
+
+function toggleTheme() {
+    const nextTheme =
+        currentTheme === 'dark'
+            ? 'light'
+            : 'dark';
+
+    applyTheme(nextTheme);
+
+    persistTheme(nextTheme);
+}
+
+
+// ============================================================
+// Save-score modal
+// ============================================================
+
+function showSaveModal() {
+    const modal =
+        document.getElementById('save-modal');
+
+    if (!modal) {
+        return;
+    }
+
+    const timeElement =
+        document.getElementById('modal-time');
+
+    const difficultyElement =
+        document.getElementById('modal-difficulty');
+
+    const hintsElement =
+        document.getElementById('modal-hints');
+
+    const nameInput =
+        document.getElementById('player-name');
+
+    if (timeElement) {
+        timeElement.textContent =
+            formatTime(
+                lastCompletionTimeSeconds || 0
+            );
+    }
+
+    if (difficultyElement) {
+        difficultyElement.textContent =
+            currentDifficulty || '';
+    }
+
+    if (hintsElement) {
+        hintsElement.textContent =
+            String(hintsUsed);
+    }
+
+    if (nameInput) {
+        nameInput.value = '';
+    }
+
+    modal.setAttribute(
+        'aria-hidden',
+        'false'
+    );
+
+    if (nameInput) {
+        setTimeout(() => {
+            nameInput.focus();
+        }, 0);
+    }
+}
+
+
+function hideSaveModal() {
+    const modal =
+        document.getElementById('save-modal');
+
+    if (!modal) {
+        return;
+    }
+
+    modal.setAttribute(
+        'aria-hidden',
+        'true'
+    );
+}
+
+
+function onSaveScore() {
+    const nameInput =
+        document.getElementById('player-name');
+
+    const saveButton =
+        document.getElementById('save-score');
+
+    if (!nameInput) {
+        return;
+    }
+
+    const name =
+        nameInput.value.trim();
+
+    if (!name) {
+        setMessage(
+            'Please enter your name to save your score.',
+            'error'
+        );
+
+        nameInput.focus();
+
+        return;
+    }
+
+    const timeSeconds =
+        lastCompletionTimeSeconds !== null
+            ? lastCompletionTimeSeconds
+            : getElapsedSeconds();
+
+    const score = {
+        name: name,
+        timeSeconds: Number(timeSeconds),
+        timeFormatted: formatTime(
+            Number(timeSeconds)
+        ),
+        difficulty: currentDifficulty || null,
+        hintsUsed: Number(hintsUsed),
+        ts: Date.now()
+    };
+
+    if (saveButton) {
+        saveButton.disabled = true;
+    }
+
+    const saved =
+        insertScore(score);
+
+    if (saved) {
+        gameScoreSaved = true;
+
+        hideSaveModal();
+
+        renderLeaderboard();
+
+        setMessage(
+            'Score saved successfully!',
+            'success'
+        );
+    } else {
+        setMessage(
+            'Failed to save score. Please try again.',
+            'error'
+        );
+    }
+
+    if (saveButton) {
+        saveButton.disabled = false;
+    }
+}
+
+
+// ============================================================
+// New game
+// ============================================================
+
+async function newGame() {
+    resetTimer();
+
+    hintsUsed = 0;
+
+    const hintCount =
+        document.getElementById('hint-count');
+
+    if (hintCount) {
+        hintCount.textContent = 'Hints: 0';
+    }
+
+    const hintButton =
+        document.getElementById('hint');
+
+    if (hintButton) {
+        hintButton.disabled = false;
+    }
+
+    gameScoreSaved = false;
+
+    const difficultyElement =
+        document.getElementById('difficulty');
+
+    currentDifficulty =
+        difficultyElement
+            ? difficultyElement.value
+            : null;
+
+    clearMessage();
+
+    try {
+        const url =
+            currentDifficulty
+                ? `/new?difficulty=${encodeURIComponent(currentDifficulty)}`
+                : '/new';
+
+        const response =
+            await fetch(url);
+
+        if (!response.ok) {
+            const errorData =
+                await response.json().catch(
+                    () => ({})
+                );
+
+            throw new Error(
+                errorData.error ||
+                'Failed to load puzzle.'
+            );
+        }
+
+        const data =
+            await response.json();
+
+        if (
+            !data ||
+            !Array.isArray(data.puzzle)
+        ) {
+            throw new Error(
+                'Invalid puzzle data received.'
+            );
+        }
+
+        renderPuzzle(data.puzzle);
+
+        startTimer();
+    } catch (error) {
+        console.error(
+            'New game error:',
+            error
+        );
+
+        setMessage(
+            error.message ||
+            'Failed to load new puzzle.',
+            'error'
+        );
+    }
+}
+
+
+// ============================================================
+// Check solution
+// ============================================================
+
+async function checkSolution() {
+    const boardDiv =
+        document.getElementById('sudoku-board');
+
+    if (!boardDiv) {
+        return;
+    }
+
+    const inputs =
+        boardDiv.querySelectorAll('.sudoku-cell');
+
+    const board =
+        readBoardFromDOM();
+
+    try {
+        const response =
+            await fetch('/check', {
+                method: 'POST',
+                headers: {
+                    'Content-Type':
+                        'application/json'
+                },
+                body: JSON.stringify({
+                    board: board
+                })
+            });
+
+        const data =
+            await response.json();
+
+        if (!response.ok || data.error) {
+            setMessage(
+                data.error ||
+                'Unable to check the puzzle.',
+                'error'
+            );
+
+            return;
+        }
+
+        const incorrectPositions =
+            data.incorrect || [];
+
+        const incorrectSet =
+            new Set(
+                incorrectPositions.map(
+                    position =>
+                        position[0] * SIZE +
+                        position[1]
+                )
+            );
+
+        inputs.forEach((input, index) => {
+            if (input.disabled) {
+                return;
+            }
+
+            /*
+             * Remove old "Check Solution" error styling.
+             * Preserve block shading, hints and input state.
+             */
+            input.classList.remove('incorrect');
+
+            if (incorrectSet.has(index)) {
+                input.classList.add('incorrect');
+            }
+        });
+
+        if (incorrectSet.size === 0) {
+            stopTimer();
+
+            const hintsText =
+                hintsUsed === 1
+                    ? '1 hint'
+                    : `${hintsUsed} hints`;
+
+            setMessage(
+                `Congratulations! You solved it in ${formatTime(lastCompletionTimeSeconds)} using ${hintsText}.`,
+                'success'
+            );
+
+            if (!gameScoreSaved) {
+                showSaveModal();
+            }
+        } else {
+            setMessage(
+                'Some cells are incorrect.',
+                'error'
+            );
+        }
+    } catch (error) {
+        console.error(
+            'Check solution error:',
+            error
+        );
+
+        setMessage(
+            'Unable to check the solution. Please try again.',
+            'error'
+        );
+    }
+}
+
+
+// ============================================================
+// Keyboard support for modal
+// ============================================================
+
+function handleModalKeyboard(event) {
+    const modal =
+        document.getElementById('save-modal');
+
+    if (!modal) {
+        return;
+    }
+
+    if (
+        modal.getAttribute('aria-hidden') === 'false' &&
+        event.key === 'Escape'
+    ) {
+        hideSaveModal();
+    }
+}
+
+
+// ============================================================
+// Expose helpers for testing / integration
+// ============================================================
+
 window.loadTopScores = loadScores;
 window.insertTopScore = insertScore;
 window.clearTopScores = clearLeaderboard;
 
-// Modal control functions
-function showSaveModal() {
-  const modal = document.getElementById('save-modal');
-  if (!modal) return;
-  const timeSpan = document.getElementById('modal-time');
-  const diffSpan = document.getElementById('modal-difficulty');
-  const hintsSpan = document.getElementById('modal-hints');
-  const nameInput = document.getElementById('player-name');
-  if (timeSpan) timeSpan.innerText = formatTime(lastCompletionTimeSeconds || 0);
-  if (diffSpan) diffSpan.innerText = currentDifficulty || '';
-  if (hintsSpan) hintsSpan.innerText = String(hintsUsed);
-  if (nameInput) nameInput.value = '';
-  modal.setAttribute('aria-hidden', 'false');
-}
+window.getHintsUsed = function () {
+    return hintsUsed;
+};
 
-function hideSaveModal() {
-  const modal = document.getElementById('save-modal');
-  if (!modal) return;
-  modal.setAttribute('aria-hidden', 'true');
-}
+window.getElapsedSeconds =
+    getElapsedSeconds;
 
-function onSaveScore() {
-  const nameInput = document.getElementById('player-name');
-  const saveBtn = document.getElementById('save-score');
-  const msg = document.getElementById('message');
-  if (!nameInput) return;
-  const name = String(nameInput.value || '').trim();
-  if (!name) {
-    alert('Please enter your name to save the score.');
-    return;
-  }
-  if (saveBtn) saveBtn.disabled = true;
-  const timeSeconds = lastCompletionTimeSeconds != null ? lastCompletionTimeSeconds : getElapsedSeconds();
-  const score = {
-    name,
-    timeSeconds: Number(timeSeconds),
-    timeFormatted: formatTime(Number(timeSeconds)),
-    difficulty: currentDifficulty || null,
-    hintsUsed: Number(hintsUsed || 0),
-    ts: Date.now(),
-  };
-  const ok = insertScore(score);
-  if (ok) {
-    gameScoreSaved = true;
-    hideSaveModal();
-    renderLeaderboard();
-    if (msg) {
-      msg.style.color = '#388e3c';
-      msg.innerText = 'Score saved successfully!';
-    }
-  } else {
-    if (msg) {
-      msg.style.color = '#d32f2f';
-      msg.innerText = 'Failed to save score. Please try again.';
-    }
-    alert('Failed to save score.');
-  }
-  if (saveBtn) saveBtn.disabled = false;
-}
+window.getLastCompletionTimeSeconds =
+    function () {
+        return lastCompletionTimeSeconds;
+    };
 
-// expose getters for future scoreboard integration
-window.getElapsedSeconds = getElapsedSeconds;
-window.getLastCompletionTimeSeconds = function () { return lastCompletionTimeSeconds; };
 
-async function newGame() {
-  // stop/reset any previous timer before starting a new fetch
-  resetTimer();
-  // reset hints
-  hintsUsed = 0;
-  const hintCountEl = document.getElementById('hint-count');
-  if (hintCountEl) hintCountEl.innerText = `Hints: ${hintsUsed}`;
-  const hintBtn = document.getElementById('hint');
-  if (hintBtn) hintBtn.disabled = false;
-  // reset per-game scoreboard flag
-  gameScoreSaved = false;
-  // read selected difficulty from UI
-  const diffEl = document.getElementById('difficulty');
-  const selected = diffEl ? diffEl.value : null;
-  currentDifficulty = selected || null;
-  const msgEl = document.getElementById('message');
-  try {
-    // request server with difficulty param when provided
-    const url = currentDifficulty ? `/new?difficulty=${encodeURIComponent(currentDifficulty)}` : '/new';
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('Network response was not ok');
-    const data = await res.json();
-    if (!data || !data.puzzle) throw new Error('Invalid puzzle data');
-    renderPuzzle(data.puzzle);
-    if (msgEl) {
-      msgEl.style.color = '';
-      msgEl.innerText = '';
-    }
-    // start timer only after puzzle successfully loaded
-    startTimer();
-  } catch (err) {
-    if (msgEl) {
-      msgEl.style.color = '#d32f2f';
-      msgEl.innerText = 'Failed to load new puzzle.';
-    }
-    console.error('newGame error:', err);
-  }
-}
+// ============================================================
+// Event wiring
+// ============================================================
 
-async function checkSolution() {
-  const boardDiv = document.getElementById('sudoku-board');
-  const inputs = boardDiv.getElementsByTagName('input');
-  const board = [];
-  for (let i = 0; i < SIZE; i++) {
-    board[i] = [];
-    for (let j = 0; j < SIZE; j++) {
-      const idx = i * SIZE + j;
-      const val = inputs[idx].value;
-      board[i][j] = val ? parseInt(val, 10) : 0;
-    }
-  }
-  const res = await fetch('/check', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({board})
-  });
-  const data = await res.json();
-  const msg = document.getElementById('message');
-  if (data.error) {
-    msg.style.color = '#d32f2f';
-    msg.innerText = data.error;
-    return;
-  }
-  const incorrect = new Set(data.incorrect.map(x => x[0]*SIZE + x[1]));
-  for (let idx = 0; idx < inputs.length; idx++) {
-    const inp = inputs[idx];
-    if (inp.disabled) continue;
-    const baseClasses = ['sudoku-cell'];
-    if (inp.classList.contains('block-shaded')) baseClasses.push('block-shaded');
-    if (incorrect.has(idx)) baseClasses.push('incorrect');
-    inp.className = baseClasses.join(' ');
-  }
-  if (incorrect.size === 0) {
-    // stop timer when puzzle is completely correct
-    stopTimer();
-    msg.style.color = '#388e3c';
-    const hintsText = hintsUsed === 1 ? '1 hint' : `${hintsUsed} hints`;
-    msg.innerText = `Congratulations! You solved it in ${formatTime(lastCompletionTimeSeconds)} using ${hintsText}.`;
-    // Only prompt to save score once per completed game
-    if (!gameScoreSaved) {
-      showSaveModal();
-    }
-  } else {
-    msg.style.color = '#d32f2f';
-    msg.innerText = 'Some cells are incorrect.';
-  }
-}
-
-// Wire buttons
 window.addEventListener('load', () => {
-  document.getElementById('new-game').addEventListener('click', newGame);
-  document.getElementById('check-solution').addEventListener('click', checkSolution);
-  const hintBtn = document.getElementById('hint');
-  if (hintBtn) hintBtn.addEventListener('click', requestHint);
-  const themeBtn = document.getElementById('theme-toggle');
-  if (themeBtn) themeBtn.addEventListener('click', toggleTheme);
-  // leaderboard actions
-  const clearBtn = document.getElementById('clear-leaderboard');
-  if (clearBtn) clearBtn.addEventListener('click', () => {
-    if (!confirm('Clear all leaderboard scores?')) return;
-    clearLeaderboard();
-  });
-  const saveBtn = document.getElementById('save-score');
-  const cancelBtn = document.getElementById('cancel-save');
-  if (saveBtn) saveBtn.addEventListener('click', onSaveScore);
-  if (cancelBtn) cancelBtn.addEventListener('click', hideSaveModal);
-  initTheme();
-  // render leaderboard initially
-  renderLeaderboard();
-  // initialize
-  newGame();
+    const newGameButton =
+        document.getElementById('new-game');
+
+    const checkButton =
+        document.getElementById('check-solution');
+
+    const hintButton =
+        document.getElementById('hint');
+
+    const themeButton =
+        document.getElementById('theme-toggle');
+
+    const clearButton =
+        document.getElementById('clear-leaderboard');
+
+    const saveButton =
+        document.getElementById('save-score');
+
+    const cancelButton =
+        document.getElementById('cancel-save');
+
+    if (newGameButton) {
+        newGameButton.addEventListener(
+            'click',
+            newGame
+        );
+    }
+
+    if (checkButton) {
+        checkButton.addEventListener(
+            'click',
+            checkSolution
+        );
+    }
+
+    if (hintButton) {
+        hintButton.addEventListener(
+            'click',
+            requestHint
+        );
+    }
+
+    if (themeButton) {
+        themeButton.addEventListener(
+            'click',
+            toggleTheme
+        );
+    }
+
+    if (clearButton) {
+        clearButton.addEventListener(
+            'click',
+            () => {
+                const confirmed =
+                    confirm(
+                        'Clear all leaderboard scores?'
+                    );
+
+                if (confirmed) {
+                    clearLeaderboard();
+                    setMessage(
+                        'Leaderboard cleared.',
+                        'success'
+                    );
+                }
+            }
+        );
+    }
+
+    if (saveButton) {
+        saveButton.addEventListener(
+            'click',
+            onSaveScore
+        );
+    }
+
+    if (cancelButton) {
+        cancelButton.addEventListener(
+            'click',
+            hideSaveModal
+        );
+    }
+
+    document.addEventListener(
+        'keydown',
+        handleModalKeyboard
+    );
+
+    initTheme();
+
+    renderLeaderboard();
+
+    newGame();
 });

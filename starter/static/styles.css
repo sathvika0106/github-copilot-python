@@ -1,3 +1,7 @@
+/* ============================================================
+   Base page
+   ============================================================ */
+
 body {
     font-family: Arial, sans-serif;
     background: #f4f4f4;
@@ -5,6 +9,7 @@ body {
     margin: 0;
     padding: 0;
     color: #212121;
+    transition: background 0.2s, color 0.2s;
 }
 
 body.dark-mode {
@@ -12,56 +17,37 @@ body.dark-mode {
     color: #f1f1f1;
 }
 
+
+/* ============================================================
+   Heading
+   ============================================================ */
+
 h1 {
     margin-top: 30px;
     color: #333;
 }
+
+body.dark-mode h1 {
+    color: #f1f1f1;
+}
+
+
+/* ============================================================
+   Sudoku board
+   ============================================================ */
 
 #sudoku-board {
     display: inline-block;
     margin: 30px auto;
     border: 4px solid #333;
     background: #fff;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 body.dark-mode #sudoku-board {
     border-color: #bbb;
     background: #1c1c1c;
-    box-shadow: 0 2px 8px rgba(255,255,255,0.08);
-}
-
-body.dark-mode #timer {
-    color: #f1f1f1;
-    background: rgba(50,50,50,0.9);
-    border-color: #444;
-}
-
-body.dark-mode #leaderboard-section,
-body.dark-mode .modal-content {
-    background: #161616;
-    color: #f1f1f1;
-}
-
-body.dark-mode #leaderboard th,
-body.dark-mode #leaderboard td {
-    border-color: #333;
-}
-
-body.dark-mode #leaderboard tbody tr:nth-child(odd) {
-    background: rgba(255,255,255,0.04);
-}
-body.dark-mode h1 {
-    color: #f1f1f1;
-}
-body.dark-mode #hint-count {
-    color: #f1f1f1;
-}
-body.dark-mode input,
-body.dark-mode select {
-    background: #1f1f1f;
-    color: #f1f1f1;
-    border-color: #444;
+    box-shadow: 0 2px 8px rgba(255, 255, 255, 0.08);
 }
 
 .sudoku-row {
@@ -71,45 +57,44 @@ body.dark-mode select {
 .sudoku-cell {
     width: 40px;
     height: 40px;
+
+    /*
+     * Keeps all cells the same size even when
+     * validation borders are applied.
+     */
     box-sizing: border-box;
+
     border: 1px solid #bbb;
+
     text-align: center;
     font-size: 20px;
+    font-weight: 400;
+
     outline: none;
+
     background: #fafafa;
-    transition: background 0.2s, color 0.2s, border-color 0.2s;
+    color: #212121;
+
+    transition:
+        background 0.2s,
+        color 0.2s,
+        border-color 0.2s,
+        box-shadow 0.2s;
 }
+
+
+/* ============================================================
+   Alternating 3x3 blocks
+   ============================================================ */
 
 .sudoku-cell.block-shaded {
     background: #f3f3f3;
 }
-.sudoku-cell.invalid-input {
-    background: #ffcdd2;
-    border-color: #e53935;
-}
-body.dark-mode .sudoku-cell {
-    background: #1a1a1a;
-    border-color: #444;
-    color: #f6f6f6;
-}
 
-body.dark-mode .sudoku-cell.block-shaded {
-    background: #232323;
-}
 
-.sudoku-cell:focus {
-    background: #e0f7fa;
-}
-
-.sudoku-cell.prefilled {
-    background: #e0e0e0;
-    font-weight: bold;
-    color: #333;
-}
-
-.sudoku-cell.incorrect {
-    background: #ffcdd2;
-}
+/* ============================================================
+   Sudoku block borders
+   ============================================================ */
 
 .sudoku-cell:nth-child(3),
 .sudoku-cell:nth-child(6) {
@@ -121,11 +106,132 @@ body.dark-mode .sudoku-cell.block-shaded {
     border-bottom: 3px solid #333;
 }
 
+
+/* ============================================================
+   Cell focus
+   ============================================================ */
+
+.sudoku-cell:focus {
+    background: #e0f7fa;
+    box-shadow: inset 0 0 0 2px #29b6f6;
+}
+
+
+/* ============================================================
+   Prefilled cells
+   ============================================================ */
+
+.sudoku-cell.prefilled {
+    background: #e0e0e0;
+    font-weight: bold;
+    color: #333;
+}
+
+
+/* ============================================================
+   Immediate invalid input
+   ============================================================ */
+
+.sudoku-cell.invalid-input {
+    background: #ffcdd2;
+    border-color: #e53935;
+
+    /*
+     * box-shadow avoids changing the cell dimensions.
+     */
+    box-shadow: inset 0 0 0 2px #e53935;
+
+    color: #8b0000;
+    font-weight: 700;
+}
+
+
+/* ============================================================
+   Check Solution incorrect cells
+   ============================================================ */
+
+.sudoku-cell.incorrect {
+    background: #ffcdd2;
+    box-shadow: inset 0 0 0 2px #e53935;
+    border-color: #e53935;
+    color: #8b0000;
+    font-weight: 700;
+}
+
+
+/* ============================================================
+   Dark mode cells
+   ============================================================ */
+
+body.dark-mode .sudoku-cell {
+    background: #1a1a1a;
+    border-color: #444;
+    color: #f6f6f6;
+}
+
+body.dark-mode .sudoku-cell.block-shaded {
+    background: #232323;
+}
+
+body.dark-mode .sudoku-cell:focus {
+    background: #263238;
+    box-shadow: inset 0 0 0 2px #29b6f6;
+}
+
+
+/* ============================================================
+   Dark mode prefilled cells
+   ============================================================ */
+
+body.dark-mode .sudoku-cell.prefilled {
+    background: #333;
+    color: #ffffff;
+}
+
+
+/* ============================================================
+   Dark mode immediate invalid cells
+   ============================================================ */
+
+body.dark-mode .sudoku-cell.invalid-input {
+    background: #7f1d1d;
+    border-color: #ff5252;
+
+    /*
+     * Uses inset shadow instead of a larger border
+     * so the board remains perfectly aligned.
+     */
+    box-shadow: inset 0 0 0 2px #ff5252;
+
+    color: #ffffff;
+    font-weight: 700;
+}
+
+
+/* ============================================================
+   Dark mode Check Solution errors
+   ============================================================ */
+
+body.dark-mode .sudoku-cell.incorrect {
+    background: #7f1d1d;
+    border-color: #ff5252;
+    box-shadow: inset 0 0 0 2px #ff5252;
+    color: #ffffff;
+    font-weight: 700;
+}
+
+
+/* ============================================================
+   Controls
+   ============================================================ */
+
 .controls {
     margin: 20px auto;
+
     display: flex;
     align-items: center;
     justify-content: center;
+
     gap: 12px;
     flex-wrap: wrap;
 }
@@ -133,17 +239,29 @@ body.dark-mode .sudoku-cell.block-shaded {
 button {
     padding: 8px 18px;
     margin: 0 8px;
+
     font-size: 16px;
+
     border: none;
+    border-radius: 4px;
+
     background: #1976d2;
     color: #fff;
-    border-radius: 4px;
+
     cursor: pointer;
-    transition: background 0.2s;
+
+    transition:
+        background 0.2s,
+        opacity 0.2s;
 }
 
 button:hover {
     background: #1565c0;
+}
+
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 body.dark-mode button {
@@ -154,28 +272,309 @@ body.dark-mode button:hover {
     background: #1b5e20;
 }
 
+
+/* ============================================================
+   Difficulty selector
+   ============================================================ */
+
+select {
+    padding: 5px 8px;
+    border: 1px solid #bbb;
+    border-radius: 4px;
+    background: #fff;
+    color: #212121;
+}
+
+body.dark-mode select {
+    background: #1f1f1f;
+    color: #f1f1f1;
+    border-color: #444;
+}
+
+
+/* ============================================================
+   Message
+   ============================================================ */
+
 #message {
     margin-left: 20px;
     font-size: 16px;
     color: #d32f2f;
+    min-height: 20px;
 }
 
 body.dark-mode #message {
     color: #ffb74d;
 }
 
-/* Timer styles */
+
+/* ============================================================
+   Hint count
+   ============================================================ */
+
+#hint-count {
+    font-size: 16px;
+    color: #333;
+}
+
+body.dark-mode #hint-count {
+    color: #f1f1f1;
+}
+
+
+/* ============================================================
+   Hint cell
+   ============================================================ */
+
+.sudoku-cell.hinted {
+    background: #fff3e0;
+    border-color: #ffb74d;
+    color: #000;
+    font-weight: 600;
+}
+
+body.dark-mode .sudoku-cell.hinted {
+    background: #795548;
+    border-color: #ffb74d;
+    color: #ffffff;
+    font-weight: 700;
+}
+
+
+/* ============================================================
+   Timer
+   ============================================================ */
+
 #timer {
     display: inline-block;
+
     min-width: 68px;
+
     padding: 6px 10px;
+
     font-size: 18px;
     font-weight: 600;
+
     color: #212121;
-    background: rgba(255,255,255,0.9);
+
+    background: rgba(255, 255, 255, 0.9);
+
     border: 1px solid #ddd;
     border-radius: 6px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+body.dark-mode #timer {
+    color: #f1f1f1;
+    background: rgba(50, 50, 50, 0.9);
+    border-color: #444;
+}
+
+
+/* ============================================================
+   Leaderboard
+   ============================================================ */
+
+#leaderboard-section {
+    margin: 24px auto;
+
+    max-width: 760px;
+
+    padding: 0 12px;
+}
+
+body.dark-mode #leaderboard-section {
+    background: #161616;
+    color: #f1f1f1;
+}
+
+#leaderboard {
+    width: 100%;
+
+    border-collapse: collapse;
+
+    margin-top: 8px;
+}
+
+#leaderboard th,
+#leaderboard td {
+    padding: 8px 10px;
+
+    border-bottom: 1px solid #e0e0e0;
+
+    text-align: left;
+
+    font-size: 14px;
+}
+
+#leaderboard tbody tr:nth-child(odd) {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+body.dark-mode #leaderboard th,
+body.dark-mode #leaderboard td {
+    border-color: #333;
+}
+
+body.dark-mode #leaderboard tbody tr:nth-child(odd) {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+
+/* ============================================================
+   Leaderboard actions
+   ============================================================ */
+
+.leaderboard-actions {
+    margin-top: 8px;
+}
+
+#clear-leaderboard {
+    background: #e53935;
+
+    padding: 6px 12px;
+
+    border-radius: 4px;
+
+    color: #fff;
+}
+
+#clear-leaderboard:hover {
+    background: #d32f2f;
+}
+
+
+/* ============================================================
+   Save score modal
+   ============================================================ */
+
+.modal {
+    display: none;
+
+    position: fixed;
+
+    inset: 0;
+
+    background: rgba(0, 0, 0, 0.45);
+
+    align-items: center;
+    justify-content: center;
+
+    z-index: 1000;
+}
+
+.modal[aria-hidden="false"] {
+    display: flex;
+}
+
+.modal-content {
+    background: #fff;
+
+    padding: 18px;
+
+    border-radius: 8px;
+
+    max-width: 420px;
+    width: 92%;
+
+    box-shadow:
+        0 6px 24px rgba(0, 0, 0, 0.2);
+
+    color: #212121;
+
+    text-align: left;
+}
+
+body.dark-mode .modal-content {
+    background: #161616;
+    color: #f1f1f1;
+}
+
+.modal-body {
+    margin: 12px 0;
+}
+
+.modal-body label {
+    display: block;
+
+    margin-bottom: 6px;
+
+    font-weight: 600;
+}
+
+.modal-body input[type="text"] {
+    width: 100%;
+
+    box-sizing: border-box;
+
+    padding: 8px;
+
+    font-size: 16px;
+
+    margin-bottom: 10px;
+
+    border: 1px solid #bbb;
+    border-radius: 4px;
+}
+
+body.dark-mode .modal-body input[type="text"] {
+    background: #1f1f1f;
+    color: #f1f1f1;
+    border-color: #444;
+}
+
+.modal-info div {
+    margin: 6px 0;
+}
+
+.modal-actions {
+    display: flex;
+
+    gap: 8px;
+
+    justify-content: flex-end;
+}
+
+.modal-actions button {
+    padding: 8px 12px;
+
+    border-radius: 4px;
+
+    border: none;
+
+    cursor: pointer;
+}
+
+#save-score {
+    background: #1976d2;
+    color: #fff;
+}
+
+#save-score:hover {
+    background: #1565c0;
+}
+
+#cancel-save {
+    background: #9e9e9e;
+    color: #fff;
+}
+
+
+/* ============================================================
+   Responsive design
+   ============================================================ */
+
+@media (max-width: 480px) {
+    #leaderboard th,
+    #leaderboard td {
+        font-size: 13px;
+        padding: 6px 8px;
+    }
+
+    .modal-content {
+        padding: 12px;
+    }
 }
 
 @media (max-width: 420px) {
@@ -184,125 +583,22 @@ body.dark-mode #message {
         min-width: 56px;
         padding: 4px 8px;
     }
-}
 
-/* Leaderboard styles */
-#leaderboard-section {
-    margin: 24px auto;
-    max-width: 760px;
-    padding: 0 12px;
-}
+    .sudoku-cell {
+        width: 10vw;
+        height: 10vw;
+        max-width: 40px;
+        max-height: 40px;
+        font-size: 18px;
+    }
 
-#leaderboard {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 8px;
-}
-
-#leaderboard th, #leaderboard td {
-    padding: 8px 10px;
-    border-bottom: 1px solid #e0e0e0;
-    text-align: left;
-    font-size: 14px;
-}
-
-#leaderboard tbody tr:nth-child(odd) {
-    background: rgba(0,0,0,0.02);
-}
-
-.leaderboard-actions {
-    margin-top: 8px;
-}
-
-#clear-leaderboard {
-    background: #e53935;
-    padding: 6px 12px;
-    border-radius: 4px;
-    color: #fff;
-    border: none;
-    cursor: pointer;
-}
-
-#clear-leaderboard:hover { background: #d32f2f; }
-
-/* Modal styles */
-.modal {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.45);
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-}
-
-.modal[aria-hidden="false"] { display: flex; }
-
-.modal-content {
-    background: #fff;
-    padding: 18px;
-    border-radius: 8px;
-    max-width: 420px;
-    width: 92%;
-    box-shadow: 0 6px 24px rgba(0,0,0,0.2);
-}
-
-.modal-body { margin: 12px 0; }
-.modal-body label { display:block; margin-bottom:6px; font-weight:600; }
-.modal-body input[type="text"] { width:100%; padding:8px; font-size:16px; margin-bottom:10px; }
-.modal-info div { margin: 6px 0; }
-.modal-actions { display:flex; gap:8px; justify-content:flex-end; }
-.modal-actions button { padding:8px 12px; border-radius:4px; border:none; cursor:pointer; }
-#save-score { background:#1976d2; color:#fff; }
-#cancel-save { background:#9e9e9e; color:#fff; }
-
-@media (max-width: 480px) {
-  #leaderboard th, #leaderboard td { font-size: 13px; padding:6px 8px; }
-  .modal-content { padding:12px; }
-}
-
-/* Hint controls */
-#hint-count {
-    font-size: 16px;
-    color: #333;
-}
-
-/* Hinted cell style */
-.sudoku-cell.hinted {
-    background: #fff3e0; /* light orange */
-    border-color: #ffb74d;
-    color: #000;
-    font-weight: 600;
-}
-
-/* Ensure hinted cells remain readable on small screens */
-@media (max-width: 420px) {
     .sudoku-cell.hinted {
         font-size: 18px;
     }
-}
 
-/* Dark mode: clearly visible wrong cells without changing cell size */
-body.dark-mode .sudoku-cell.invalid-input {
-    background: #7f1d1d;
-    border: 2px solid #ff5252;
-    box-sizing: border-box;
-    color: #ffffff;
-    font-weight: 700;
-}
-
-body.dark-mode .sudoku-cell.incorrect {
-    background: #7f1d1d;
-    border: 3px solid #ff5252;
-    box-sizing: border-box;
-    color: #ffffff;
-    font-weight: 700;
-}
-
-/* Dark mode: hinted cells */
-body.dark-mode .sudoku-cell.hinted {
-    background: #795548;
-    border-color: #ffb74d;
-    color: #ffffff;
-    font-weight: 700;
+    #message {
+        width: 100%;
+        margin-left: 0;
+        margin-top: 5px;
+    }
 }
