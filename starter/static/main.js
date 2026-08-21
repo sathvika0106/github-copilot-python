@@ -146,50 +146,66 @@ function handleBoardInput(event) {
 
     cell.value = cleanedValue;
 
-    // Remove previous validation state.
-    cell.classList.remove('invalid-input');
-
-    if (!cleanedValue) {
-        clearConflictMessageIfNeeded();
-        return;
-    }
-
-    /*
-     * Immediately check:
-     * - same row
-     * - same column
-     * - same 3x3 block
-     */
-    if (hasSudokuConflict(cell)) {
-        cell.classList.add('invalid-input');
-
-        setMessage(
-            'That value conflicts with the row, column, or 3×3 box.',
-            'error'
-        );
-    } else {
-        clearConflictMessageIfNeeded();
-    }
+    validateBoardConflicts();
 }
 
 
-function hasSudokuConflict(cell) {
-    if (!cell || !cell.value) {
-        return false;
-    }
-
-    const value = cell.value;
-
-    const row = Number(cell.dataset.row);
-    const col = Number(cell.dataset.col);
-
+function validateBoardConflicts() {
     const boardDiv = document.getElementById('sudoku-board');
 
     if (!boardDiv) {
         return false;
     }
 
-    const cells = boardDiv.querySelectorAll('.sudoku-cell');
+    const cells = Array.from(
+        boardDiv.querySelectorAll('.sudoku-cell')
+    );
+    const conflictTypes = new Set();
+
+    cells.forEach(cell => {
+        cell.classList.remove('invalid-input');
+    });
+
+    cells.forEach(cell => {
+        if (cell.disabled || !cell.value) {
+            return;
+        }
+
+        const conflicts = getConflictTypes(cell, cells);
+
+        if (conflicts.length === 0) {
+            return;
+        }
+
+        cell.classList.add('invalid-input');
+        conflicts.forEach(type => conflictTypes.add(type));
+    });
+
+    if (conflictTypes.size === 0) {
+        clearMessage();
+        return false;
+    }
+
+    setMessage(
+        `Value conflicts with another value in the ${
+            formatConflictTypes(conflictTypes)
+        }.`,
+        'error'
+    );
+
+    return true;
+}
+
+
+function getConflictTypes(cell, cells) {
+    if (!cell || !cell.value) {
+        return [];
+    }
+
+    const value = cell.value;
+    const row = Number(cell.dataset.row);
+    const col = Number(cell.dataset.col);
+    const conflicts = new Set();
 
     for (const otherCell of cells) {
         if (otherCell === cell) {
@@ -205,11 +221,11 @@ function hasSudokuConflict(cell) {
         }
 
         if (Number(otherCell.dataset.row) === row) {
-            return true;
+            conflicts.add('same row');
         }
 
         if (Number(otherCell.dataset.col) === col) {
-            return true;
+            conflicts.add('same column');
         }
 
         const otherRow = Number(otherCell.dataset.row);
@@ -220,22 +236,26 @@ function hasSudokuConflict(cell) {
             Math.floor(col / 3) === Math.floor(otherCol / 3);
 
         if (sameBlock) {
-            return true;
+            conflicts.add('same 3x3 box');
         }
     }
 
-    return false;
+    return Array.from(conflicts);
 }
 
 
-function clearConflictMessageIfNeeded() {
-    const invalidCells = document.querySelectorAll(
-        '.sudoku-cell.invalid-input'
-    );
+function formatConflictTypes(conflictTypes) {
+    const types = Array.from(conflictTypes);
 
-    if (invalidCells.length === 0) {
-        clearMessage();
+    if (types.length === 1) {
+        return types[0];
     }
+
+    if (types.length === 2) {
+        return `${types[0]} or ${types[1]}`;
+    }
+
+    return `${types[0]}, ${types[1]}, or ${types[2]}`;
 }
 
 
