@@ -7,6 +7,7 @@ import pytest
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from app import app as flask_app
+from app import validate_board
 from sudoku_logic import (
     create_empty_board,
     deep_copy,
@@ -41,6 +42,32 @@ def check_board_valid(board):
                 for c in range(3):
                     vals.append(board[br + r][bc + c])
             assert set(vals) == set(range(1, SIZE + 1))
+
+
+def test_validate_board_accepts_valid_partial_board():
+    board = create_empty_board()
+    board[0][0] = 5
+
+    assert validate_board(board)
+
+
+@pytest.mark.parametrize("invalid_board", [
+    None,
+    [],
+    [[0] * SIZE for _ in range(SIZE - 1)],
+    [[0] * (SIZE - 1) for _ in range(SIZE)],
+    [[0] * SIZE for _ in range(SIZE - 1)] + [[0] * (SIZE + 1)],
+])
+def test_validate_board_rejects_invalid_structure(invalid_board):
+    assert not validate_board(invalid_board)
+
+
+@pytest.mark.parametrize("value", [-1, 10, 1.5, True, "0"])
+def test_validate_board_rejects_invalid_cell_values(value):
+    board = create_empty_board()
+    board[0][0] = value
+
+    assert not validate_board(board)
 
 
 def test_create_empty_board():
@@ -86,6 +113,7 @@ def test_generate_puzzle_returns_puzzle_and_solution_with_correct_clues():
     puzzle, solution = generate_puzzle(clues=clues)
     # solution is complete
     assert count_non_empty(solution) == SIZE * SIZE
+    check_board_valid(solution)
     # puzzle has exactly 'clues' non-empty cells
     assert count_non_empty(puzzle) == clues
 

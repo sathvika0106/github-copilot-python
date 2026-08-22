@@ -127,6 +127,10 @@ body.dark-mode #sudoku-board {
     color: #333;
 }
 
+.sudoku-cell.prefilled.block-shaded {
+    background: #d6d6d6;
+}
+
 
 /* ============================================================
    Immediate invalid input
@@ -186,6 +190,10 @@ body.dark-mode .sudoku-cell:focus {
 body.dark-mode .sudoku-cell.prefilled {
     background: #333;
     color: #ffffff;
+}
+
+body.dark-mode .sudoku-cell.prefilled.block-shaded {
+    background: #3d3d3d;
 }
 
 

@@ -926,6 +926,11 @@ function onSaveScore() {
     const saveButton =
         document.getElementById('save-score');
 
+    if (gameScoreSaved) {
+        hideSaveModal();
+        return;
+    }
+
     if (!nameInput) {
         return;
     }

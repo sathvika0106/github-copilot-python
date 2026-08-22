@@ -138,12 +138,15 @@ def remove_cells(board, clues):
 
 
 def generate_puzzle(clues=35):
-    board = create_empty_board()
-    fill_board(board)
-    solution = deep_copy(board)
-    remove_cells(board, clues)
-    puzzle = deep_copy(board)
-    return puzzle, solution
+    while True:
+        board = create_empty_board()
+        fill_board(board)
+        solution = deep_copy(board)
+        remove_cells(board, clues)
+        puzzle = deep_copy(board)
+
+        if count_solutions(puzzle, limit=2) == 1:
+            return puzzle, solution
 
 
 def generate_puzzle_for_difficulty(difficulty):
